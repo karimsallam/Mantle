@@ -9,6 +9,7 @@
 #import "MTLJSONAdapter.h"
 #import "MTLModel.h"
 #import "MTLReflection.h"
+#import "NSDictionary+MTLManipulationAdditions.h"
 
 NSString * const MTLJSONAdapterErrorDomain = @"MTLJSONAdapterErrorDomain";
 const NSInteger MTLJSONAdapterErrorNoClassFound = 2;
@@ -94,12 +95,35 @@ static NSString * const MTLJSONAdapterThrownExceptionErrorKey = @"MTLJSONAdapter
 		NSAssert([modelClass conformsToProtocol:@protocol(MTLJSONSerializing)], @"Class %@ returned from +classForParsingJSONDictionary: does not conform to <MTLJSONSerializing>", modelClass);
 	}
 
+	NSDictionary *mappingOverrideJSONDictionary = nil;
+	if ([modelClass respondsToSelector:@selector(JSONKeyPathsByPropertyOverrideKey)]) {
+		NSString *mappingOverrideJSONDictionaryKey = [modelClass JSONKeyPathsByPropertyOverrideKey];
+		mappingOverrideJSONDictionary = JSONDictionary[mappingOverrideJSONDictionaryKey];
+		if (mappingOverrideJSONDictionary == nil) {
+			if (error != NULL) {
+				NSDictionary *userInfo = @{
+										   NSLocalizedDescriptionKey: NSLocalizedString(@"Could not parse JSON", @""),
+										   NSLocalizedFailureReasonErrorKey:[NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"No JSON mapping override found for %@ key", @""), mappingOverrideJSONDictionaryKey]
+										   };
+				
+				*error = [NSError errorWithDomain:MTLJSONAdapterErrorDomain code:MTLJSONAdapterErrorInvalidJSONDictionary userInfo:userInfo];
+			}
+			
+			return nil;
+		}
+		
+		NSAssert([mappingOverrideJSONDictionary isKindOfClass:[NSDictionary class]], @"JSON mapping override for %@ key is not a NSDictionary", mappingOverrideJSONDictionaryKey);
+	}
+
 	self = [super init];
 	if (self == nil) return nil;
 
 	_modelClass = modelClass;
 	_JSONKeyPathsByPropertyKey = [[modelClass JSONKeyPathsByPropertyKey] copy];
-
+	if (mappingOverrideJSONDictionary != nil) {
+		_JSONKeyPathsByPropertyKey = [_JSONKeyPathsByPropertyKey mtl_dictionaryByAddingEntriesFromDictionary:mappingOverrideJSONDictionary];
+	}
+	
 	NSMutableDictionary *dictionaryValue = [[NSMutableDictionary alloc] initWithCapacity:JSONDictionary.count];
 
 	for (NSString *propertyKey in [self.modelClass propertyKeys]) {

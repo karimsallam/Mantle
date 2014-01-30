@@ -52,6 +52,13 @@
 // to abort parsing (e.g., if the data is invalid).
 + (Class)classForParsingJSONDictionary:(NSDictionary *)JSONDictionary;
 
+// Overridden to parse the receiver by merging mapping informations from the JSON itself.
+//
+// The JSON format MUST be: "property_name" : "json_key"
+//
+// Return the key to lookup in JSON for the mapping override or nil if no override is wanted.
++ (NSString *)JSONKeyPathsByPropertyOverrideKey;
+
 @end
 
 // The domain for errors originating from MTLJSONAdapter.
